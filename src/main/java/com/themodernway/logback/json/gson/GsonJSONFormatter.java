@@ -36,17 +36,7 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
 
     public GsonJSONFormatter()
     {
-        m_format = getNormalBuilder().create();
-    }
-
-    protected GsonBuilder getNormalBuilder()
-    {
-        return new GsonBuilder().registerTypeAdapterFactory(new GsonJava8TypeAdapterFactory()).disableHtmlEscaping().serializeNulls().serializeSpecialFloatingPointValues();
-    }
-
-    protected GsonBuilder getPrettyBuilder()
-    {
-        return getNormalBuilder().setPrettyPrinting();
+        m_format = new GsonBuilder().registerTypeAdapterFactory(new GsonJava8TypeAdapterFactory()).disableHtmlEscaping().serializeNulls().serializeSpecialFloatingPointValues().create();
     }
 
     @Override
@@ -62,11 +52,11 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
         {
             if (m_pretty = pretty)
             {
-                m_format = getPrettyBuilder().create();
+                m_format = new GsonBuilder().registerTypeAdapterFactory(new GsonJava8TypeAdapterFactory()).disableHtmlEscaping().serializeNulls().serializeSpecialFloatingPointValues().setPrettyPrinting().create();
             }
             else
             {
-                m_format = getNormalBuilder().create();
+                m_format = new GsonBuilder().registerTypeAdapterFactory(new GsonJava8TypeAdapterFactory()).disableHtmlEscaping().serializeNulls().serializeSpecialFloatingPointValues().create();
             }
         }
     }
