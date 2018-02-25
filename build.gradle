@@ -220,15 +220,15 @@ def String getBuildGITHomeURL() {
 }
 
 def String getBuildGITCommitHash() {
-    ''//getBuildGITHomeURL() + '/commit/' + Grgit.open(gfile('.')).head().id
+    getBuildGITHomeURL() + '/commit/' + Grgit.open(gfile('.')).head().id
 }
 
 def String getBuildGITCommitUser() {
-    ''//Grgit.open(gfile('.')).head().committer.email
+    Grgit.open(gfile('.')).head().committer.email
 }
 
 def String getBuildGITCommitMessage() {
-    ''//Grgit.open(gfile('.')).head().shortMessage
+    Grgit.open(gfile('.')).head().shortMessage
 }
 
 def File gfile(String name) {

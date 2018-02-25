@@ -47,7 +47,7 @@ http://docs.themodernway.com/documents/reports/logback-json-gson-v2/findbugs/mai
 
 CVE Dependency Check URL:
 
-http://docs.themodernway.com/documents/reports/logback-json-core-v2/cve/dependency-check-report.html
+http://docs.themodernway.com/documents/reports/logback-json-gson-v2/cve/dependency-check-report.html
 
 License:
 
