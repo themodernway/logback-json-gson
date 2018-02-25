@@ -135,7 +135,6 @@ pmd {
         'java-empty',
         'java-imports',
         'java-optimizations',
-        'java-strings',
         'java-unusedcode'
     ]
 }
