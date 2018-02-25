@@ -1,0 +1,319 @@
+/*
+ * Copyright (c) 2018, The Modern Way. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+buildscript {
+    repositories { mavenCentral() }
+    dependencies {
+        classpath(group: 'org.ajoberstar', name: 'grgit', version: '1.7.2')
+        classpath(group: 'commons-codec', name: 'commons-codec', version: '1.11')
+        classpath(group: 'commons-logging', name: 'commons-logging', version: '1.2')
+        classpath(group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.5')
+        classpath(group: 'org.fusesource.jansi', name: 'jansi', version: '1.17')
+        classpath(group: 'org.codehaus.groovy', name: 'groovy-all', version: '2.4.13', classifier: 'indy')
+        classpath(group: 'org.owasp', name: 'dependency-check-gradle', version: '3.1.1')
+    }
+}
+
+import org.apache.tools.ant.filters.FixCrLfFilter
+import org.apache.tools.ant.filters.ReplaceTokens
+import java.net.InetAddress
+import org.ajoberstar.grgit.Grgit
+
+apply plugin: 'pmd'
+apply plugin: 'maven'
+apply plugin: 'groovy'
+apply plugin: 'jacoco'
+apply plugin: 'signing'
+apply plugin: 'eclipse'
+apply plugin: 'findbugs'
+apply plugin: 'checkstyle'
+apply plugin: 'org.owasp.dependencycheck'
+
+compileJava.options.encoding = 'UTF-8'
+
+sourceCompatibility = 1.8
+
+targetCompatibility = 1.8
+
+version = '2.0.0-SNAPSHOT'
+
+group = 'com.themodernway'
+
+task deleteConfigs(type: Delete) {
+    FileTree tree = fileTree(dir: "${buildDir}/resources/main")
+    tree.each { File file ->
+        file.delete()
+    }
+}
+
+task filterConfigs(dependsOn: deleteConfigs, type: Copy) {
+    from sourceSets.main.allSource
+    into "${buildDir}/resources/main"
+    filter(FixCrLfFilter)
+    filter(ReplaceTokens, tokens: getFilterTokens())
+}
+
+task doJavaDocs(type: Javadoc) {
+    source = sourceSets.main.allSource
+    classpath = sourceSets.main.runtimeClasspath + buildscript.configurations.classpath
+    destinationDir = gfile("${buildDir}/docs/javadoc")
+    includes = ['com/themodernway/logback/json/gson/**']
+    title = "${getProjectCommonName()}"
+    (options as StandardJavadocDocletOptions).with {
+        links = getJavaDocLinks()
+        bottom = "<div><h4 class=\"footer\"><a href=\"${getBuildGITHomeURL()}\" target=\"_blank\">${getProjectCommonName()} - Copyright &copy; 2018, The Modern Way</a> - <a href=\"${getBuildGITCommitHash()}\" target=\"_blank\">${getBuildModuleVersion()}</a> - <a href=\"mailto:deansjones@gmail.com\">Author: Dean S. Jones</a></h4></div>"
+    }
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: doJavaDocs) {
+    classifier = 'javadoc'
+    from "${buildDir}/docs/javadoc"
+}
+
+checkstyle {
+    toolVersion = '7.7'
+    ignoreFailures = true
+}
+
+tasks.withType(Checkstyle) { source 'src/main' }
+
+compileJava.dependsOn(clean)
+
+jar.dependsOn(filterConfigs)
+
+task codeCoverage { doLast { println ':codeCoverage-done' } }
+
+codeCoverage.dependsOn jacocoTestReport
+
+jacocoTestReport {
+    reports {
+        csv {
+            enabled true
+            destination gfile("${buildDir}/reports/jacoco/coverage-${version}.csv")
+        }
+        xml.enabled false
+        html.destination gfile("${buildDir}/reports/coverage")
+    }
+}
+
+jacocoTestReport.dependsOn test
+
+test {
+    minHeapSize = '2048m'
+    maxHeapSize = '2048m'
+    testLogging.showStandardStreams = true
+    jacoco {
+        append = false
+        destinationFile = gfile("${buildDir}/jacoco/testing.exec")
+    }
+}
+
+pmd {
+    ignoreFailures = true
+    toolVersion = '5.6.1'
+    ruleSets = [
+        'java-basic',
+        'java-braces',
+        'java-empty',
+        'java-imports',
+        'java-optimizations',
+        'java-strings',
+        'java-unusedcode'
+    ]
+}
+
+findbugs {
+    ignoreFailures = true
+    toolVersion = '3.0.1'
+    effort = 'max'
+    excludeFilter = gfile('config/findbugs/filter.xml')
+}
+
+tasks.withType(FindBugs) {
+    reports {
+        xml.enabled false
+        html.enabled true
+    }
+}
+
+dependencyCheck {
+    failOnError = false
+    outputDirectory = "${buildDir}/reports/cve"
+    suppressionFile = gfile('config/cve/suppress.xml')
+}
+
+task checkCodeQuality { doLast { println ':checkCodeQuality-done' } }
+
+checkCodeQuality.dependsOn codeCoverage,checkstyleMain,pmdMain,findbugsMain,dependencyCheckAnalyze
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': getProjectTitle(), 'Implementation-Version': getBuildModuleVersion()
+    }
+}
+
+def getFilterTokens() {
+    [GRADLE_BUILD_ARTIFACT_ID: getProjectArtifactID(), GRADLE_BUILD_PROJECT_TITLE: getProjectTitle(), GRADLE_BUILD_USER: getBuildUser(), GRADLE_BUILD_DATE: getBuildDate(), GRADLE_JAVA_VERSION: getJavaVersion(), GRADLE_GIT_COMMIT_HASH: getBuildGITCommitHash(), GRADLE_GIT_COMMIT_USER: getBuildGITCommitUser(), GRADLE_GIT_COMMIT_MESSAGE: getBuildGITCommitMessage(), GRADLE_BUILD_SERVER_HOST: getBuildServerHost(), GRADLE_BUILD_SERVER_BUILD: getBuildServerBuild(), GRADLE_BUILD_MODULE_VERSION: getBuildModuleVersion()]
+}
+
+def String getProjectArtifactID() {
+    getProjectTitle().toLowerCase()
+}
+
+def String getProjectTitle() {
+    getProjectCommonName().replaceAll(' ', '-')
+}
+
+def String getProjectCommonName() {
+    'Logback JSON Gson'
+}
+
+def String getBuildModuleVersion() {
+    version
+}
+
+def String getBuildDate() {
+    (new Date()).toString()
+}
+
+def String getBuildServerHost() {
+    try {
+        InetAddress.getLocalHost().getHostName()
+    }
+    catch (Exception e) {
+        'localhost'
+    }
+}
+
+def String getJavaVersion() {
+    System.getProperty('java.version') ?: 'unknown'
+}
+
+def String getBuildUser() {
+    System.getProperty('user.name') ?: 'unknown'
+}
+
+def String getBuildServerBuild() {
+    System.getenv('BUILD_DISPLAY_NAME') ?: "Gradle version ${gradle.gradleVersion}"
+}
+
+def String getBuildGITHomeURL() {
+    'https://github.com/themodernway/' + getProjectArtifactID()
+}
+
+def String getBuildGITCommitHash() {
+    ''//getBuildGITHomeURL() + '/commit/' + Grgit.open(gfile('.')).head().id
+}
+
+def String getBuildGITCommitUser() {
+    ''//Grgit.open(gfile('.')).head().committer.email
+}
+
+def String getBuildGITCommitMessage() {
+    ''//Grgit.open(gfile('.')).head().shortMessage
+}
+
+def File gfile(String name) {
+    project.file(name)
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url "${sonatype_snapshotURL}"
+    }
+}
+
+sourceSets {
+    main { resources { source java } }
+    test { resources { source groovy } }
+}
+
+dependencies {
+    compile(group: 'com.themodernway', name: 'logback-json-core', version: '2.0.0-SNAPSHOT')
+    compile(group: 'com.google.code.gson', name: 'gson', version: '2.8.2')
+    compile(group: 'net.dongliu', name: 'gson-java8-datatype', version: '1.1.0')
+    testCompile(group: 'org.codehaus.groovy', name: 'groovy-all', version: '2.4.13', classifier: 'indy')
+    testCompile(group: 'org.spockframework', name: 'spock-core', version: '1.1-groovy-2.4') {
+        exclude(group: 'org.codehaus.groovy', module: 'groovy-all')
+    }
+    testCompile(group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25')
+    testCompile(group: 'org.slf4j', name: 'jcl-over-slf4j', version: '1.7.25')
+    testCompile(group: 'org.slf4j', name: 'jul-to-slf4j', version: '1.7.25')
+    testCompile(group: 'commons-logging', name: 'commons-logging', version: '1.2')
+}
+
+artifacts {
+    archives sourcesJar
+    archives javadocJar
+    archives jar
+}
+
+signing { sign configurations.archives }
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+            //repository(url: "${sonatype_stageingURL}") {
+            repository(url: "${sonatype_snapshotURL}") {
+                authentication(userName: "${sonatype_user_tmw}", password: "${sonatype_password_tmw}")
+            }
+            pom.project {
+                name 'Logback-JSON-Gson'
+                packaging 'jar'
+                description 'Logback-JSON-Gson is common integfaces and utility classes for Logback JSON support.'
+                url 'https://github.com/themodernway/logback-json-gson.git'
+                scm {
+                    url 'scm:git@github.com:themodernway/logback-json-gson.git'
+                    connection 'scm:git@github.com:themodernway/logback-json-gson.git'
+                    developerConnection 'scm:git@github.com:themodernway/logback-json-gson.git'
+                }
+                licenses {
+                    license {
+                        name 'The Apache Software License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        distribution 'repo'
+                    }
+                }
+                developers {
+                    developer {
+                        id 'sprocketnyc'
+                        name 'Dean S. Jones'
+                        email 'deansjones@gmail.com'
+                        url 'https://www.themodernway.com'
+                    }
+                }
+            }
+        }
+    }
+}
+
+def List<String> getJavaDocLinks() {
+    List list = []
+    File data = gfile('javadoconf/JAVADOC_LINK_SITES.txt')
+    if (data.exists()) {
+        data.eachLine { line ->
+            list << line
+        }
+    }
+    list
+}
