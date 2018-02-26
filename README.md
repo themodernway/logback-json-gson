@@ -49,6 +49,10 @@ CVE Dependency Check URL:
 
 http://docs.themodernway.com/documents/reports/logback-json-gson-v2/cve/dependency-check-report.html
 
+SonarQube URL:
+
+https://sonarcloud.io/dashboard?id=com.themodernway%3Alogback-json-gson
+
 License:
 
 Copyright (c) 2018, The Modern Way. All rights reserved.
