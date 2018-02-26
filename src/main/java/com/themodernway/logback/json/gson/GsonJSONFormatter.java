@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -30,13 +31,32 @@ import net.dongliu.gson.GsonJava8TypeAdapterFactory;
 
 public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
 {
-    private Gson    m_format;
+    private final static int              RND_BUFF_SZ = 16;
 
-    private boolean m_pretty;
+    private final static int              MID_BUFF_SZ = 4096;
+
+    private final static int              MIN_BUFF_SZ = MID_BUFF_SZ / 4;
+
+    private final static int              MAX_BUFF_SZ = MID_BUFF_SZ * 4;
+
+    private final static long             MIN_WINDOWS = 1L;
+
+    private final static long             MAX_WINDOWS = 3600000L;
+
+    private final static Gson             NORMAL_GSON = new GsonBuilder().registerTypeAdapterFactory(new GsonJava8TypeAdapterFactory()).disableHtmlEscaping().serializeNulls().serializeSpecialFloatingPointValues().create();
+
+    private final static Gson             PRETTY_GSON = new GsonBuilder().registerTypeAdapterFactory(new GsonJava8TypeAdapterFactory()).disableHtmlEscaping().serializeNulls().serializeSpecialFloatingPointValues().setPrettyPrinting().create();
+
+    private Gson                          m_format    = NORMAL_GSON;
+
+    private long                          m_window    = MIN_WINDOWS;
+
+    private boolean                       m_pretty    = Boolean.FALSE;
+
+    private final TimeWindowMovingAverage m_moving    = new TimeWindowMovingAverage(MIN_WINDOWS, TimeUnit.MILLISECONDS).add(MID_BUFF_SZ);
 
     public GsonJSONFormatter()
     {
-        m_format = new GsonBuilder().registerTypeAdapterFactory(new GsonJava8TypeAdapterFactory()).disableHtmlEscaping().serializeNulls().serializeSpecialFloatingPointValues().create();
     }
 
     @Override
@@ -52,37 +72,73 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
         {
             if (m_pretty = pretty)
             {
-                m_format = new GsonBuilder().registerTypeAdapterFactory(new GsonJava8TypeAdapterFactory()).disableHtmlEscaping().serializeNulls().serializeSpecialFloatingPointValues().setPrettyPrinting().create();
+                m_format = PRETTY_GSON;
             }
             else
             {
-                m_format = new GsonBuilder().registerTypeAdapterFactory(new GsonJava8TypeAdapterFactory()).disableHtmlEscaping().serializeNulls().serializeSpecialFloatingPointValues().create();
+                m_format = NORMAL_GSON;
             }
         }
+    }
+
+    public void setAverageWindow(long window)
+    {
+        if ((window = Math.min(Math.max(window, MIN_WINDOWS), MAX_WINDOWS)) != getAverageWindow())
+        {
+            final int last = getAverageBufferingSize();
+
+            m_moving.reset();
+
+            m_moving.setWindow(m_window = window, TimeUnit.MILLISECONDS);
+
+            m_moving.add(last);
+        }
+    }
+
+    public long getAverageWindow()
+    {
+        return m_window;
+    }
+
+    private final static int rup(final int n, final int m)
+    {
+        return (n % m) + n;
+    }
+
+    public int getAverageBufferingSize()
+    {
+        return rup((int) Math.round(Math.min(Math.max(m_moving.getAverage(), MIN_BUFF_SZ), MAX_BUFF_SZ)), RND_BUFF_SZ);
     }
 
     @Override
     public String toJSONString(final Map<String, Object> target) throws Exception
     {
-        final GsonEscapedStringBuilderWriter writer = new GsonEscapedStringBuilderWriter(4096);
+        try (GsonEscapedStringBuilderWriter writer = new GsonEscapedStringBuilderWriter(getAverageBufferingSize()))
+        {
+            m_format.toJson(target, writer);
 
-        m_format.toJson(target, writer);
+            m_moving.add(writer.capacity());
 
-        return writer.toString();
+            return writer.toString();
+        }
     }
 
     protected static class GsonEscapedStringBuilderWriter extends Writer
     {
+        private final int           m_maxsize;
+
         private final StringBuilder m_builder;
 
-        public GsonEscapedStringBuilderWriter(final int size)
+        public GsonEscapedStringBuilderWriter(final int maxsize)
         {
-            this(new StringBuilder(size));
+            this(new StringBuilder(maxsize), maxsize);
         }
 
-        protected GsonEscapedStringBuilderWriter(final StringBuilder builder)
+        protected GsonEscapedStringBuilderWriter(final StringBuilder builder, final int maxsize)
         {
             super(Objects.requireNonNull(builder));
+
+            m_maxsize = maxsize;
 
             m_builder = builder;
         }
@@ -108,7 +164,7 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
         @Override
         public void write(final char chr[], final int off, final int len) throws IOException
         {
-            if (null != chr)
+            if ((null != chr) && (chr.length > 0) && (len > 0))
             {
                 for (int i = 0; i < len; i++)
                 {
@@ -122,7 +178,9 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
         {
             if (null != str)
             {
-                append(str);
+                final char[] chr = str.toCharArray();
+
+                write(chr, 0, chr.length);
             }
         }
 
@@ -131,7 +189,7 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
         {
             if (null != str)
             {
-                append(str.substring(off, off + len));
+                write(str.substring(off, off + len));
             }
         }
 
@@ -140,12 +198,7 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
         {
             if (null != chs)
             {
-                final int size = chs.length();
-
-                for (int i = 0; i < size; i++)
-                {
-                    escape(chs.charAt(i));
-                }
+                write(chs.toString());
             }
             return this;
         }
@@ -155,7 +208,7 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
         {
             if (null != chs)
             {
-                append(chs.subSequence(beg, end));
+                write(chs.subSequence(beg, end).toString());
             }
             return this;
         }
@@ -166,6 +219,11 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
             escape(c);
 
             return this;
+        }
+
+        public int capacity()
+        {
+            return m_builder.capacity();
         }
 
         @Override
@@ -182,10 +240,15 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
         @Override
         public void close() throws IOException
         {
+            flush();
+
+            clear();
         }
 
         public GsonEscapedStringBuilderWriter clear()
         {
+            m_builder.ensureCapacity(m_maxsize);
+
             m_builder.setLength(0);
 
             return this;
