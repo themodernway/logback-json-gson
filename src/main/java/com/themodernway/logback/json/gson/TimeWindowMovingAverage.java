@@ -56,9 +56,11 @@ public class TimeWindowMovingAverage
         return m_window;
     }
 
-    public void setWindow(final long window, final TimeUnit unit)
+    public synchronized TimeWindowMovingAverage setWindow(final long window, final TimeUnit unit)
     {
         m_window = getUnitOf(validate(window, 1, 1), Objects.requireNonNull(unit));
+
+        return this;
     }
 
     public long getWindow(final TimeUnit unit)
@@ -114,12 +116,12 @@ public class TimeWindowMovingAverage
         return toPlaces(3);
     }
 
-    protected long getUnitOf(final long duration, final TimeUnit unit)
+    public long getUnitOf(final long duration, final TimeUnit unit)
     {
         return Objects.requireNonNull(getUnit()).convert(duration, Objects.requireNonNull(unit));
     }
 
-    protected long validate(final long duration, final long lbounds, final long minimum)
+    public long validate(final long duration, final long lbounds, final long minimum)
     {
         final long result = Math.max(duration, lbounds);
 
