@@ -67,11 +67,11 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
     {
         m_pretty = false;
 
-        m_window = MIN_WINDOWS;
+        m_window = MID_WINDOWS;
 
         m_format = makeGsonBuilder().create();
 
-        m_moving = new TimeWindowMovingAverage(MID_WINDOWS, TimeUnit.MILLISECONDS).add(MID_BUFF_SZ);
+        m_moving = new TimeWindowMovingAverage(m_window, TimeUnit.MILLISECONDS).add(MID_BUFF_SZ);
     }
 
     @Override
@@ -183,7 +183,7 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
         }
 
         @Override
-        public void write(final char chr[], final int off, final int len) throws IOException
+        public void write(final char[] chr, final int off, final int len) throws IOException
         {
             if ((null != chr) && (chr.length > 0) && (len > 0))
             {
@@ -256,14 +256,13 @@ public class GsonJSONFormatter implements IJSONFormatter, IJSONCommon
         @Override
         public void flush()
         {
+            // do nothing for flush
         }
 
         @Override
         public void close() throws IOException
         {
-            flush();
-
-            clear();
+            // do nothing for close
         }
 
         public GsonEscapedStringBuilderWriter clear()

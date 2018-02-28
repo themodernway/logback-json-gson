@@ -105,17 +105,6 @@ public class TimeWindowMovingAverage
         return this;
     }
 
-    public String toPlaces(final int places)
-    {
-        return String.format("%." + Math.min(Math.max(places, 0), 8) + "f", getAverage());
-    }
-
-    @Override
-    public String toString()
-    {
-        return toPlaces(3);
-    }
-
     public long getUnitOf(final long duration, final TimeUnit unit)
     {
         return Objects.requireNonNull(getUnit()).convert(duration, Objects.requireNonNull(unit));
