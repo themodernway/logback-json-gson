@@ -12,13 +12,13 @@ Maven:
 <dependency>
   <groupId>com.themodernway</groupId>
   <artifactId>logback-json-gson</artifactId>
-  <version>2.0.5-SNAPSHOT</version>
+  <version>2.0.6-SNAPSHOT</version>
 </dependency>
 ```
 Gradle:
 ```
 dependencies {
-    compile(group: 'com.themodernway', name: 'logback-json-gson', version: '2.0.5-SNAPSHOT')
+    compile(group: 'com.themodernway', name: 'logback-json-gson', version: '2.0.6-SNAPSHOT')
 }
 ```
 Javadoc URL:

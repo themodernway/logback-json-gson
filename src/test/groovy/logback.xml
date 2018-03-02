@@ -24,7 +24,11 @@
 				<JSONFormatter class="com.themodernway.logback.json.gson.GsonJSONFormatter" />
 				<ShowThreadName>false</ShowThreadName>
 				<ShowContextName>false</ShowContextName>
-				<Pretty>true</Pretty>
+				<ShowUniqueId>false</ShowUniqueId>
+				<ShowRawMessage>false</ShowRawMessage>
+				<ShowMDC>false</ShowMDC>
+				<ShowArguments>false</ShowArguments>
+				<Pretty>false</Pretty>
 			</layout>
 		</encoder>
 	</appender>
