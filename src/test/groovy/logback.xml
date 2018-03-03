@@ -28,8 +28,8 @@
 				<ShowRawMessage>false</ShowRawMessage>
 				<ShowMDC>false</ShowMDC>
 				<ShowArguments>false</ShowArguments>
-				<Pretty>false</Pretty>
 			</layout>
+			<charset>UTF-8</charset>
 		</encoder>
 	</appender>
 	<root level="INFO">
