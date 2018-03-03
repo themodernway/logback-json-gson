@@ -32,6 +32,15 @@ public class Main
     {
         final long stop = System.currentTimeMillis() + 6400000L;
 
+        go(10000L, 5L, stop, () -> logger.info("info"));
+
+        go(10000L, 5L, stop, () -> logger.warn("warn"));
+
+        go(10000L, 1000L, stop, () -> logger.error("oops", new JSONFormattingException("oops")));
+    }
+
+    public static void go(final long delay, final long period, final long stop, final Runnable work)
+    {
         final Timer timer = new Timer();
 
         final TimerTask task = new TimerTask()
@@ -39,11 +48,7 @@ public class Main
             @Override
             public void run()
             {
-                logger.info("info");
-
-                logger.warn("warn");
-
-                logger.error("oops", new JSONFormattingException("oops"));
+                work.run();
 
                 if (System.currentTimeMillis() >= stop)
                 {
@@ -51,6 +56,6 @@ public class Main
                 }
             }
         };
-        timer.scheduleAtFixedRate(task, 10000, 5);
+        timer.scheduleAtFixedRate(task, delay, period);
     }
 }
